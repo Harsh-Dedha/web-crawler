@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MiniSearch — Distributed Search Engine</title>
+  <meta name="description" content="Async crawler, Redis Bloom filter, PostgreSQL tsvector and a NumPy BM25 ranker built from scratch.">
+  <style>
+    :root {
+      --bg: #06080f;
+      --panel: rgba(12, 20, 36, 0.78);
+      --panel-solid: #0b1220;
+      --line: rgba(148, 163, 184, 0.15);
+      --line-strong: rgba(148, 163, 184, 0.28);
+      --text: #e8eef8;
+      --muted: #91a4bf;
+      --faint: #64748b;
+      --cyan: #38bdf8;
+      --cyan-soft: rgba(56, 189, 248, 0.14);
+      --violet: #a78bfa;
+      --violet-soft: rgba(167, 139, 250, 0.14);
+      --green: #34d399;
+      --amber: #fbbf24;
+      --mono: "Cascadia Code", "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      --sans: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: var(--sans);
+      background:
+        radial-gradient(1000px 620px at 12% -8%, rgba(56, 189, 248, 0.13), transparent 62%),
+        radial-gradient(900px 600px at 88% -4%, rgba(167, 139, 250, 0.12), transparent 58%),
+        var(--bg);
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.045) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.75), transparent 85%);
+      z-index: 0;
+    }
+
+    .shell { position: relative; z-index: 1; width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 26px 0 20px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--text); }
+    .brand-mark {
+      width: 38px; height: 38px; border-radius: 12px;
+      display: grid; place-items: center;
+      font-size: 20px; color: #001018;
+      background: linear-gradient(135deg, var(--cyan), #7dd3fc 55%, var(--violet));
+      box-shadow: 0 0 30px rgba(56, 189, 248, 0.25);
+    }
+    .brand strong { display: block; font-size: 14px; letter-spacing: 0.2em; }
+    .brand small { display: block; margin-top: 2px; color: var(--faint); font-size: 11px; letter-spacing: 0.08em; }
+
+    .topnav { display: flex; align-items: center; gap: 22px; font-size: 13px; }
+    .topnav a { color: var(--muted); text-decoration: none; transition: color 0.18s ease; }
+    .topnav a:hover { color: var(--text); }
+    .live { display: inline-flex; align-items: center; gap: 8px; color: var(--green); font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; }
+    .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 50% { opacity: 0.35; } }
+
+    .hero { padding: 64px 0 36px; display: grid; grid-template-columns: 1.55fr 0.9fr; gap: 48px; align-items: end; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      margin-bottom: 18px; color: var(--cyan);
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 28px; height: 1px; background: linear-gradient(90deg, var(--cyan), transparent); }
+    h1 {
+      margin: 0;
+      font-size: clamp(42px, 5vw, 66px);
+      line-height: 0.98;
+      letter-spacing: -0.045em;
+      font-weight: 680;
+    }
+    h1 span {
+      background: linear-gradient(100deg, #7dd3fc, var(--cyan) 35%, var(--violet) 90%);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .lede { margin: 22px 0 0; max-width: 650px; color: var(--muted); font-size: 16px; line-height: 1.7; }
+    .lede strong { color: #c9d8eb; font-weight: 600; }
+
+    .pipeline { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 11px; border: 1px solid var(--line); border-radius: 999px;
+      color: #c4d3e6; background: rgba(15, 26, 46, 0.55);
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em;
+    }
+    .chip b { color: var(--cyan); font-weight: 500; }
+
+    .hero-aside {
+      border: 1px solid var(--line); border-radius: 18px; padding: 20px 20px 18px;
+      background: linear-gradient(160deg, rgba(15, 26, 46, 0.92), rgba(7, 12, 22, 0.86));
+      box-shadow: var(--shadow);
+    }
+    .hero-aside .label { color: var(--faint); font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; }
+    .hero-aside .quote { margin: 12px 0 16px; font-size: 15px; line-height: 1.55; color: #d4e1f1; }
+    .metric-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); font-size: 12px; }
+    .metric-row span:first-child { color: var(--muted); }
+    .metric-row span:last-child { font-family: var(--mono); color: #dff3ff; }
+
+    .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 12px 0 30px; }
+    .stat {
+      position: relative; overflow: hidden;
+      padding: 17px 17px 15px; border: 1px solid var(--line); border-radius: 14px;
+      background: rgba(10, 17, 31, 0.62);
+    }
+    .stat::before { content: ""; position: absolute; inset: 0 0 auto; height: 2px; background: linear-gradient(90deg, var(--cyan), var(--violet)); opacity: 0.55; }
+    .stat label { display: block; color: var(--faint); font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+    .stat strong { display: block; margin: 8px 0 3px; font-size: 27px; letter-spacing: -0.03em; font-weight: 600; }
+    .stat small { color: var(--muted); font-size: 11px; }
+
+    .search-panel {
+      border: 1px solid var(--line-strong); border-radius: 18px; padding: 14px;
+      background: linear-gradient(180deg, rgba(14, 24, 42, 0.94), rgba(8, 14, 26, 0.94));
+      box-shadow: var(--shadow);
+    }
+    .search-form { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; }
+    .input-wrap { position: relative; display: flex; align-items: center; }
+    .input-wrap svg { position: absolute; left: 16px; width: 18px; height: 18px; stroke: var(--faint); fill: none; stroke-width: 1.8; }
+    #q {
+      width: 100%; height: 54px; padding: 0 16px 0 46px;
+      border: 1px solid transparent; border-radius: 12px; outline: none;
+      background: rgba(2, 6, 16, 0.72); color: var(--text);
+      font-family: var(--sans); font-size: 16px;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    #q::placeholder { color: #4f637d; }
+    #q:focus { border-color: rgba(56, 189, 248, 0.55); box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.08); }
+
+    .mode-toggle { display: flex; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: rgba(2, 6, 16, 0.6); }
+    .mode-btn {
+      appearance: none; border: 0; border-radius: 8px; padding: 10px 13px;
+      background: transparent; color: var(--muted); cursor: pointer;
+      font-family: var(--mono); font-size: 11px; line-height: 1.25; text-align: left;
+      transition: background 0.18s ease, color 0.18s ease;
+    }
+    .mode-btn span { display: block; margin-top: 2px; color: var(--faint); font-size: 9px; letter-spacing: 0.06em; }
+    .mode-btn.active { background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(167, 139, 250, 0.14)); color: #eaf8ff; box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2); }
+    .mode-btn.active span { color: #9bd7f5; }
+
+    .go {
+      height: 54px; padding: 0 22px; border: 0; border-radius: 12px; cursor: pointer;
+      color: #021018; background: linear-gradient(135deg, #7dd3fc, var(--cyan));
+      font-family: var(--sans); font-size: 14px; font-weight: 650;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .go:hover { transform: translateY(-1px); box-shadow: 0 12px 30px rgba(56, 189, 248, 0.22); }
+    .go:active { transform: translateY(0); }
+
+    .examples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 4px 2px; }
+    .examples span { color: var(--faint); font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .example {
+      appearance: none; border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px;
+      background: transparent; color: var(--muted); cursor: pointer;
+      font-family: var(--mono); font-size: 11px;
+    }
+    .example:hover { color: var(--text); border-color: var(--line-strong); background: rgba(148, 163, 184, 0.06); }
+
+    .results-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 30px 2px 12px; }
+    .results-head .left { display: flex; align-items: baseline; gap: 10px; }
+    .results-head strong { font-size: 13px; font-weight: 600; letter-spacing: 0.01em; }
+    .results-head span { color: var(--faint); font-family: var(--mono); font-size: 11px; }
+    .latency { display: inline-flex; align-items: center; gap: 8px; color: var(--green); font-family: var(--mono); font-size: 11px; }
+    .latency::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px rgba(52, 211, 153, 0.8); }
+    .mode-badge { padding: 5px 8px; border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; color: var(--cyan); background: var(--cyan-soft); font-family: var(--mono); font-size: 9px; letter-spacing: 0.08em; }
+
+    .results { display: grid; gap: 10px; padding-bottom: 40px; }
+    .result {
+      display: grid; grid-template-columns: 54px 1fr; gap: 6px;
+      padding: 18px 20px 17px; border: 1px solid var(--line); border-radius: 14px;
+      background: linear-gradient(180deg, rgba(12, 20, 36, 0.82), rgba(8, 14, 26, 0.78));
+      transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+    }
+    .result:hover { border-color: rgba(56, 189, 248, 0.32); transform: translateY(-1px); background: linear-gradient(180deg, rgba(14, 25, 44, 0.92), rgba(8, 14, 26, 0.86)); }
+    .rank { padding-top: 2px; color: #42536a; font-family: var(--mono); font-size: 13px; }
+    .result-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+    .result-title { color: #dcecff; text-decoration: none; font-size: 18px; font-weight: 600; letter-spacing: -0.012em; }
+    .result-title:hover { color: #9fe4ff; }
+    .domain { color: var(--faint); font-family: var(--mono); font-size: 10px; letter-spacing: 0.03em; }
+    .url { display: inline-block; margin-top: 5px; max-width: 100%; color: #527291; font-family: var(--mono); font-size: 10px; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .url:hover { color: var(--cyan); }
+    .snippet { margin: 9px 0 13px; color: #a9bdd4; font-size: 13px; line-height: 1.65; }
+    .snippet mark { padding: 1px 3px; border-radius: 3px; background: rgba(56, 189, 248, 0.16); color: #c8f0ff; }
+    .score-row { display: grid; grid-template-columns: 78px 1fr 56px; gap: 10px; align-items: center; }
+    .score-label { color: var(--faint); font-family: var(--mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; }
+    .bar { height: 3px; overflow: hidden; border-radius: 999px; background: rgba(148, 163, 184, 0.12); }
+    .bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--cyan), var(--violet)); }
+    .score { color: #c7e9fb; font-family: var(--mono); font-size: 11px; text-align: right; }
+
+    .empty, .error {
+      padding: 28px; border: 1px solid var(--line); border-radius: 14px;
+      color: var(--muted); background: rgba(10, 17, 31, 0.6); font-size: 14px;
+    }
+    .error { border-color: rgba(248, 113, 113, 0.25); color: #fca5a5; }
+
+    .skeleton { height: 118px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(110deg, rgba(15, 26, 46, 0.55) 8%, rgba(30, 45, 70, 0.65) 18%, rgba(15, 26, 46, 0.55) 33%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
+    @keyframes shimmer { to { background-position-x: -200%; } }
+
+    footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 0 28px; border-top: 1px solid var(--line); color: var(--faint); font-family: var(--mono); font-size: 10px; }
+    footer a { color: #7f9ab8; text-decoration: none; }
+    footer a:hover { color: var(--cyan); }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; gap: 28px; padding-top: 44px; }
+      .hero-aside { display: none; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .search-form { grid-template-columns: 1fr; }
+      .mode-toggle { justify-content: stretch; }
+      .mode-btn { flex: 1; }
+      .go { width: 100%; }
+    }
+    @media (max-width: 560px) {
+      .shell { width: min(100% - 28px, 1180px); }
+      .topnav a:not(:last-child) { display: none; }
+      .stats { grid-template-columns: 1fr 1fr; }
+      .result { grid-template-columns: 34px 1fr; padding: 15px; }
+      .score-row { grid-template-columns: 68px 1fr 50px; }
+      footer { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/demo">
+        <span class="brand-mark">◈</span>
+        <span><strong>MINISEARCH</strong><small>distributed retrieval lab</small></span>
+      </a>
+      <nav class="topnav">
+        <span class="live"><i></i> API LIVE</span>
+        <a href="/docs" target="_blank" rel="noreferrer">API Docs ↗</a>
+        <a href="https://github.com/Harsh-Dedha/web-crawler" target="_blank" rel="noreferrer">GitHub ↗</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <div class="eyebrow">async crawler · redis bloom · numpy bm25</div>
+          <h1>Search the web.<br><span>Understand the ranking.</span></h1>
+          <p class="lede">
+            A from-scratch retrieval stack that crawls politely, deduplicates with a
+            <strong>Redis bitmap Bloom filter</strong>, stores pages in
+            <strong>PostgreSQL</strong>, and ranks them with a
+            <strong>NumPy-vectorised BM25</strong> engine — all behind one FastAPI.
+          </p>
+          <div class="pipeline">
+            <span class="chip"><b>01</b> asyncio + aiohttp</span>
+            <span class="chip"><b>02</b> robots.txt + 1 req/s</span>
+            <span class="chip"><b>03</b> Redis bitmap</span>
+            <span class="chip"><b>04</b> NumPy BM25</span>
+            <span class="chip"><b>05</b> tsvector / GIN</span>
+          </div>
+        </div>
+        <aside class="hero-aside">
+          <div class="label">query pipeline</div>
+          <div class="quote">Two engines. One interface. Compare exact in-memory BM25 against PostgreSQL’s native full-text ranker.</div>
+          <div class="metric-row"><span>crawled documents</span><span id="hero-pages">20</span></div>
+          <div class="metric-row"><span>indexed terms</span><span id="hero-terms">7,072</span></div>
+          <div class="metric-row"><span>bloom filter</span><span id="hero-bloom">1.14 MiB</span></div>
+        </aside>
+      </section>
+
+      <section class="stats" aria-label="System statistics">
+        <div class="stat"><label>documents</label><strong id="stat-pages">—</strong><small>status 200 pages</small></div>
+        <div class="stat"><label>vocabulary</label><strong id="stat-terms">—</strong><small>unique stemmed terms</small></div>
+        <div class="stat"><label>avg length</label><strong id="stat-avg">—</strong><small>tokens per document</small></div>
+        <div class="stat"><label>bloom bits</label><strong id="stat-bloom">—</strong><small id="stat-bloom-hint">7 hashes · 1.14 MiB</small></div>
+        <div class="stat"><label>frontier</label><strong id="stat-queue">—</strong><small>URLs queued</small></div>
+      </section>
+
+      <section class="search-panel" aria-label="Search">
+        <form class="search-form" id="search-form">
+          <div class="input-wrap">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.2 4.2"></path></svg>
+            <input id="q" name="q" type="search" value="distributed computing networks" autocomplete="off" spellcheck="false" placeholder="Search crawled pages…" aria-label="Search query">
+          </div>
+          <div class="mode-toggle" role="group" aria-label="Search engine">
+            <button type="button" class="mode-btn active" data-mode="bm25">BM25<span>in-memory · numpy</span></button>
+            <button type="button" class="mode-btn" data-mode="postgres">POSTGRES<span>tsvector · gin</span></button>
+          </div>
+          <button class="go" type="submit">Search <span aria-hidden="true">→</span></button>
+        </form>
+        <div class="examples">
+          <span>Try</span>
+          <button type="button" class="example" data-query="distributed computing networks">distributed computing networks</button>
+          <button type="button" class="example" data-query="search engine architecture">search engine architecture</button>
+          <button type="button" class="example" data-query="fault tolerance">fault tolerance</button>
+          <button type="button" class="example" data-query="message passing">message passing</button>
+        </div>
+      </section>
+
+      <div class="results-head">
+        <div class="left">
+          <strong id="result-count">Searching…</strong>
+          <span id="result-mode" class="mode-badge">NUMPY BM25</span>
+          <span id="latency" class="latency">—</span>
+        </div>
+        <span>en.wikipedia.org corpus</span>
+      </div>
+      <section class="results" id="results" aria-live="polite">
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+        <div class="skeleton"></div>
+      </section>
+    </main>
+
+    <footer>
+      <span>MINISEARCH / PYTHON 3.13 · FASTAPI · POSTGRESQL 17 · REDIS 8</span>
+      <span>Built by <a href="https://github.com/Harsh-Dedha" target="_blank" rel="noreferrer">Harsh Dedha</a></span>
+    </footer>
+  </div>
+
+  <script>
+    const $ = (selector) => document.querySelector(selector);
+    const initialParams = new URLSearchParams(window.location.search);
+    const initialMode = initialParams.get("mode") === "postgres" ? "postgres" : "bm25";
+    const initialQuery = initialParams.get("q") || "distributed computing networks";
+    const state = { mode: initialMode };
+
+    const fmt = (value) => (value === null || value === undefined ? "—" : Number(value).toLocaleString("en-US"));
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function snippetHtml(value) {
+      return escapeHtml(value)
+        .replaceAll("&lt;mark&gt;", "<mark>")
+        .replaceAll("&lt;/mark&gt;", "</mark>");
+    }
+
+    async function loadStats() {
+      try {
+        const response = await fetch("/stats", { headers: { Accept: "application/json" } });
+        if (!response.ok) throw new Error("stats request failed");
+        const stats = await response.json();
+        const db = stats.database || {};
+        const index = stats.index || {};
+        const crawler = stats.crawler || {};
+        const bloomMiB = crawler.bloom_size_bytes ? (crawler.bloom_size_bytes / 1048576).toFixed(2) : "—";
+
+        $("#stat-pages").textContent = fmt(db.pages);
+        $("#stat-terms").textContent = fmt(index.vocabulary_size);
+        $("#stat-avg").textContent = index.avg_doc_length ? Math.round(index.avg_doc_length).toLocaleString("en-US") : "—";
+        $("#stat-bloom").textContent = fmt(crawler.bloom_bits_set);
+        $("#stat-bloom-hint").textContent = `${crawler.bloom_hash_count || 7} hashes · ${bloomMiB} MiB`;
+        $("#stat-queue").textContent = fmt(crawler.frontier_queue_length);
+
+        $("#hero-pages").textContent = fmt(db.pages);
+        $("#hero-terms").textContent = fmt(index.vocabulary_size);
+        $("#hero-bloom").textContent = `${bloomMiB} MiB`;
+      } catch (error) {
+        console.warn(error);
+      }
+    }
+
+    function renderLoading() {
+      $("#results").innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+      $("#result-count").textContent = "Searching…";
+      $("#latency").textContent = "—";
+    }
+
+    function renderResults(data) {
+      const results = data.results || [];
+      const isBm25 = data.mode === "in-house-bm25";
+      $("#result-count").textContent = `${data.count} result${data.count === 1 ? "" : "s"}`;
+      $("#result-mode").textContent = isBm25 ? "NUMPY BM25" : "POSTGRES TSVECTOR";
+      $("#latency").textContent = `${Number(data.took_ms || 0).toFixed(2)} ms`;
+      $("#results").innerHTML = "";
+
+      if (!results.length) {
+        $("#results").innerHTML = '<div class="empty">No matching documents. Try a broader query or rebuild the index after crawling.</div>';
+        return;
+      }
+
+      const maxScore = Math.max(...results.map((result) => Number(result.score) || 0), 0.0001);
+      const rankLabel = isBm25 ? "BM25" : "TS_RANK_CD";
+
+      results.forEach((result, index) => {
+        const card = document.createElement("article");
+        card.className = "result";
+        const width = Math.max(6, (Number(result.score) / maxScore) * 100);
+        card.innerHTML = `
+          <div class="rank">${String(index + 1).padStart(2, "0")}</div>
+          <div class="result-body">
+            <div class="result-top">
+              <a class="result-title" href="${escapeHtml(result.url)}" target="_blank" rel="noreferrer">${escapeHtml(result.title || "Untitled document")}</a>
+              <span class="domain">${escapeHtml(result.domain || "unknown")}</span>
+            </div>
+            <a class="url" href="${escapeHtml(result.url)}" target="_blank" rel="noreferrer">${escapeHtml(result.url)}</a>
+            <p class="snippet">${snippetHtml(result.snippet || "")}</p>
+            <div class="score-row">
+              <span class="score-label">${rankLabel}</span>
+              <div class="bar"><i style="width:${width.toFixed(1)}%"></i></div>
+              <span class="score">${Number(result.score).toFixed(4)}</span>
+            </div>
+          </div>`;
+        $("#results").appendChild(card);
+      });
+    }
+
+    async function runSearch(query, mode) {
+      const trimmed = query.trim();
+      if (!trimmed) return;
+      state.mode = mode;
+      const pageUrl = new URL(window.location.href);
+      pageUrl.searchParams.set("q", trimmed);
+      pageUrl.searchParams.set("mode", mode);
+      window.history.replaceState(null, "", pageUrl);
+      renderLoading();
+      try {
+        const params = new URLSearchParams({ q: trimmed, mode, limit: "6" });
+        const response = await fetch(`/search?${params.toString()}`, { headers: { Accept: "application/json" } });
+        if (!response.ok) throw new Error(`search failed with HTTP ${response.status}`);
+        renderResults(await response.json());
+      } catch (error) {
+        $("#result-count").textContent = "Search unavailable";
+        $("#latency").textContent = "—";
+        $("#results").innerHTML = `<div class="error">Could not reach the search API. ${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    $("#search-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      runSearch($("#q").value, state.mode);
+    });
+
+    document.querySelectorAll(".mode-btn").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll(".mode-btn").forEach((item) => item.classList.remove("active"));
+        button.classList.add("active");
+        runSearch($("#q").value, button.dataset.mode);
+      });
+    });
+
+    document.querySelectorAll(".example").forEach((button) => {
+      button.addEventListener("click", () => {
+        $("#q").value = button.dataset.query;
+        runSearch(button.dataset.query, state.mode);
+      });
+    });
+
+    loadStats();
+    $("#q").value = initialQuery;
+    document.querySelectorAll(".mode-btn").forEach((button) => {
+      button.classList.toggle("active", button.dataset.mode === initialMode);
+    });
+    runSearch(initialQuery, initialMode);
+    window.setInterval(loadStats, 15000);
+  </script>
+</body>
+</html>

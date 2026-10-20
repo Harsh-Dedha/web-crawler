@@ -1,0 +1,144 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="690" viewBox="0 0 1200 690" role="img" aria-label="MiniSearch system architecture">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070b14"/>
+      <stop offset="0.55" stop-color="#08111f"/>
+      <stop offset="1" stop-color="#06080f"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#7dd3fc"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#c4b5fd"/>
+    </linearGradient>
+    <linearGradient id="box" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f1b2e"/>
+      <stop offset="1" stop-color="#0a1220"/>
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#94a3b8" stroke-opacity="0.075" stroke-width="1"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4f7c9e"/>
+    </marker>
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="690" fill="url(#bg)"/>
+  <rect width="1200" height="690" fill="url(#grid)"/>
+
+  <text x="60" y="52" fill="#5f7f9e" font-family="Cascadia Code, Consolas, monospace" font-size="11" letter-spacing="2.2">SYSTEM ARCHITECTURE</text>
+  <text x="60" y="84" fill="#e8eef8" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="600">Crawl → extract → persist → rank</text>
+  <text x="1140" y="52" fill="#64748b" font-family="Cascadia Code, Consolas, monospace" font-size="10" text-anchor="end">PYTHON 3.13 · FASTAPI · REDIS 8 · POSTGRES 17</text>
+
+  <!-- 01 Frontier -->
+  <g>
+    <rect x="60" y="120" width="280" height="95" rx="14" fill="url(#box)" stroke="#1c3350"/>
+    <rect x="60" y="120" width="4" height="95" rx="2" fill="url(#cyan)"/>
+    <text x="82" y="147" fill="#5f7f9e" font-family="Cascadia Code, Consolas, monospace" font-size="10" letter-spacing="1.4">01 / FRONTIER</text>
+    <text x="82" y="174" fill="#e8eef8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="600">Redis FIFO queue</text>
+    <text x="82" y="196" fill="#8fa3bf" font-family="Cascadia Code, Consolas, monospace" font-size="10">BLPOP · dedupe set · 478 URLs</text>
+  </g>
+
+  <!-- 02 Crawler -->
+  <g>
+    <rect x="440" y="120" width="300" height="95" rx="14" fill="url(#box)" stroke="#1c3350"/>
+    <rect x="440" y="120" width="4" height="95" rx="2" fill="url(#cyan)"/>
+    <text x="462" y="147" fill="#5f7f9e" font-family="Cascadia Code, Consolas, monospace" font-size="10" letter-spacing="1.4">02 / INGEST</text>
+    <text x="462" y="174" fill="#e8eef8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="600">Async crawler</text>
+    <text x="462" y="196" fill="#8fa3bf" font-family="Cascadia Code, Consolas, monospace" font-size="10">asyncio + aiohttp · 6 workers</text>
+  </g>
+
+  <!-- 03 Politeness -->
+  <g>
+    <rect x="840" y="120" width="300" height="95" rx="14" fill="url(#box)" stroke="#1c3350"/>
+    <rect x="840" y="120" width="4" height="95" rx="2" fill="url(#violet)"/>
+    <text x="862" y="147" fill="#5f7f9e" font-family="Cascadia Code, Consolas, monospace" font-size="10" letter-spacing="1.4">03 / POLITENESS</text>
+    <text x="862" y="174" fill="#e8eef8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="600">Domain rate limiter</text>
+    <text x="862" y="196" fill="#8fa3bf" font-family="Cascadia Code, Consolas, monospace" font-size="10">robots.txt · 1 req/s · backoff</text>
+  </g>
+
+  <!-- 04 Bloom -->
+  <g>
+    <rect x="840" y="260" width="300" height="95" rx="14" fill="url(#box)" stroke="#1c3350"/>
+    <rect x="840" y="260" width="4" height="95" rx="2" fill="url(#cyan)"/>
+    <text x="862" y="287" fill="#5f7f9e" font-family="Cascadia Code, Consolas, monospace" font-size="10" letter-spacing="1.4">04 / DEDUPE</text>
+    <text x="862" y="314" fill="#e8eef8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="600">Redis Bloom filter</text>
+    <text x="862" y="336" fill="#8fa3bf" font-family="Cascadia Code, Consolas, monospace" font-size="10">O(1) · 7 hashes · 1.14 MiB</text>
+  </g>
+
+  <!-- 05 Extractor -->
+  <g>
+    <rect x="440" y="290" width="300" height="95" rx="14" fill="url(#box)" stroke="#1c3350"/>
+    <rect x="440" y="290" width="4" height="95" rx="2" fill="url(#cyan)"/>
+    <text x="462" y="317" fill="#5f7f9e" font-family="Cascadia Code, Consolas, monospace" font-size="10" letter-spacing="1.4">05 / EXTRACT</text>
+    <text x="462" y="344" fill="#e8eef8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="600">Content extractor</text>
+    <text x="462" y="366" fill="#8fa3bf" font-family="Cascadia Code, Consolas, monospace" font-size="10">BeautifulSoup4 · clean text + links</text>
+  </g>
+
+  <!-- 06 Postgres -->
+  <g>
+    <rect x="120" y="460" width="310" height="105" rx="14" fill="url(#box)" stroke="#1c3350"/>
+    <rect x="120" y="460" width="4" height="105" rx="2" fill="url(#violet)"/>
+    <text x="142" y="487" fill="#5f7f9e" font-family="Cascadia Code, Consolas, monospace" font-size="10" letter-spacing="1.4">06 / STORE</text>
+    <text x="142" y="514" fill="#e8eef8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="600">PostgreSQL</text>
+    <text x="142" y="536" fill="#8fa3bf" font-family="Cascadia Code, Consolas, monospace" font-size="10">pages · generated tsvector · GIN</text>
+    <text x="142" y="554" fill="#64748b" font-family="Cascadia Code, Consolas, monospace" font-size="10">20 docs · 54,980 words</text>
+  </g>
+
+  <!-- 07 Index -->
+  <g>
+    <rect x="770" y="460" width="310" height="105" rx="14" fill="url(#box)" stroke="#1c3350"/>
+    <rect x="770" y="460" width="4" height="105" rx="2" fill="url(#cyan)"/>
+    <text x="792" y="487" fill="#5f7f9e" font-family="Cascadia Code, Consolas, monospace" font-size="10" letter-spacing="1.4">07 / RANK</text>
+    <text x="792" y="514" fill="#e8eef8" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="600">Inverted index + BM25</text>
+    <text x="792" y="536" fill="#8fa3bf" font-family="Cascadia Code, Consolas, monospace" font-size="10">NumPy vectorised · k1=1.5 · b=0.75</text>
+    <text x="792" y="554" fill="#64748b" font-family="Cascadia Code, Consolas, monospace" font-size="10">7,072 terms · 0.28 ms median</text>
+  </g>
+
+  <!-- 08 FastAPI -->
+  <g>
+    <rect x="380" y="590" width="440" height="75" rx="14" fill="#0b1728" stroke="#2b5b78"/>
+    <text x="402" y="612" fill="#5f7f9e" font-family="Cascadia Code, Consolas, monospace" font-size="10" letter-spacing="1.4">08 / SERVE</text>
+    <text x="402" y="635" fill="#dff3ff" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="600">FastAPI · dual search mode</text>
+    <text x="402" y="655" fill="#38bdf8" font-family="Cascadia Code, Consolas, monospace" font-size="10">GET /search?mode=bm25  |  GET /search?mode=postgres</text>
+  </g>
+
+  <!-- Arrows -->
+  <line x1="340" y1="167" x2="432" y2="167" stroke="#4f7c9e" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="352" y="156" fill="#64748b" font-family="Cascadia Code, Consolas, monospace" font-size="9">BLPOP</text>
+
+  <line x1="748" y1="150" x2="832" y2="150" stroke="#4f7c9e" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="832" y1="184" x2="748" y2="184" stroke="#4f7c9e" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="770" y="143" fill="#64748b" font-family="Cascadia Code, Consolas, monospace" font-size="9">robots</text>
+  <text x="776" y="204" fill="#64748b" font-family="Cascadia Code, Consolas, monospace" font-size="9">1 req/s</text>
+
+  <line x1="740" y1="204" x2="832" y2="276" stroke="#38bdf8" stroke-width="1.6" marker-end="url(#arrow-cyan)"/>
+  <text x="748" y="248" fill="#5f9fbe" font-family="Cascadia Code, Consolas, monospace" font-size="9">contains / add</text>
+
+  <line x1="590" y1="215" x2="590" y2="282" stroke="#4f7c9e" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="600" y="250" fill="#64748b" font-family="Cascadia Code, Consolas, monospace" font-size="9">HTML</text>
+
+  <line x1="500" y1="385" x2="330" y2="452" stroke="#4f7c9e" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="370" y="427" fill="#64748b" font-family="Cascadia Code, Consolas, monospace" font-size="9">clean text</text>
+
+  <line x1="680" y1="385" x2="850" y2="452" stroke="#4f7c9e" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="742" y="427" fill="#64748b" font-family="Cascadia Code, Consolas, monospace" font-size="9">tokens</text>
+
+  <line x1="330" y1="565" x2="430" y2="590" stroke="#4f7c9e" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <text x="350" y="586" fill="#64748b" font-family="Cascadia Code, Consolas, monospace" font-size="9">SQL</text>
+
+  <line x1="870" y1="565" x2="770" y2="590" stroke="#38bdf8" stroke-width="1.6" marker-end="url(#arrow-cyan)"/>
+  <text x="806" y="586" fill="#5f9fbe" font-family="Cascadia Code, Consolas, monospace" font-size="9">ranked hits</text>
+
+  <circle cx="590" cy="167" r="3" fill="#38bdf8" filter="url(#glow)"/>
+  <circle cx="590" cy="337" r="3" fill="#a78bfa" filter="url(#glow)"/>
+</svg>
